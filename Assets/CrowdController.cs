@@ -31,7 +31,6 @@ public class CrowdController : MonoBehaviour
 
     private void Start()
     {
-        
         // 启动原有的定时分批切换协程
         switchCoroutine = StartCoroutine(SwitchCrowdFlow());
         // 启动多区域密度检测协程
@@ -95,63 +94,31 @@ public class CrowdController : MonoBehaviour
     public static bool FencesEnabled = true;
 
     // 原有：手动“一键”开关围栏，并控制是否启用定时分批
-    //public void ToggleFenceSystem()
-    //{
-    //    fencesEnabled = !fencesEnabled;
-    //    fenceSystemEnabled = fencesEnabled;       // 同步控制定时逻辑是否生效
-    //    CrowdController.FencesEnabled = fencesEnabled; //  通知全局状态
-    //    fenceManager.SetAllFences(fencesEnabled); // 一次性开/关所有围栏
-    //    if (navSurface != null) navSurface.UpdateNavMesh(navSurface.navMeshData);
-
-    //    // 重新下发目的地
-    //    foreach (var a in FindObjectsOfType<NavMeshAgent>())
-    //        a.SetDestination(a.destination);
-    //    UpdateFenceStatusUI();
-    //    Debug.Log($"围栏系统已 {(fencesEnabled ? "开启" : "关闭")}");
-    //}
-
-    //// 更新 UI 文本
-    //private void UpdateFenceStatusUI()
-    //{
-    //    if (fenceStatusText != null)
-    //        fenceStatusText.text = fencesEnabled
-    //            ? "当前状态： 有围栏"
-    //            : "当前状态： 无围栏";
-    //}
-    private bool autoDensityEnabled = true;
-    private bool hasFencesArrived = false;
-    // // —— 新增：多区域密度检测协程 —— 
-    // --- 手动/自动整体开关 ---
     public void ToggleFenceSystem()
     {
         fencesEnabled = !fencesEnabled;
-        SetFenceSystemEnabled(fencesEnabled);
+        fenceSystemEnabled = fencesEnabled;       // 同步控制定时逻辑是否生效
+        CrowdController.FencesEnabled = fencesEnabled; //  通知全局状态
+        fenceManager.SetAllFences(fencesEnabled); // 一次性开/关所有围栏
+        if (navSurface != null) navSurface.UpdateNavMesh(navSurface.navMeshData);
+
+        // 重新下发目的地
+        foreach (var a in FindObjectsOfType<NavMeshAgent>())
+            a.SetDestination(a.destination);
+        UpdateFenceStatusUI();
         Debug.Log($"围栏系统已 {(fencesEnabled ? "开启" : "关闭")}");
     }
 
-    void SetFenceSystemEnabled(bool enabled)
-    {
-        fenceSystemEnabled = enabled;
-        fenceManager.SetAllFences(enabled); // 全部显示/隐藏
-        if (navSurface != null)
-            navSurface.UpdateNavMesh(navSurface.navMeshData);
-
-        foreach (var a in FindObjectsOfType<NavMeshAgent>())
-            a.SetDestination(a.destination);
-
-        UpdateFenceStatusUI();
-    }
-
-    // --- 状态UI ---
-    void UpdateFenceStatusUI()
+    // 更新 UI 文本
+    private void UpdateFenceStatusUI()
     {
         if (fenceStatusText != null)
             fenceStatusText.text = fencesEnabled
-                ? "当前状态：有围栏"
-                : "当前状态：无围栏";
+                ? "当前状态： 有围栏"
+                : "当前状态： 无围栏";
     }
-
-    // ------------------ 密度自动控制 + 移动 ------------------
+    private bool autoDensityEnabled = true;
+    // —— 新增：多区域密度检测协程 —— 
     IEnumerator CheckDensityLoop()
     {
         yield return new WaitForSeconds(densityCheckInterval);
@@ -161,104 +128,53 @@ public class CrowdController : MonoBehaviour
             if (autoDensityEnabled)
             {
                 var persons = GameObject.FindGameObjectsWithTag("Player");
-                bool anyHigh = false;
-                bool allLow = true;
+                bool anyHigh = false;   // 任一区域高于上限
+                bool allLow = true;    // 全部区域都低于下限
 
+                // —— 对每个监控区分别算密度 —— 
                 foreach (var zone in monitoringZones)
                 {
+                    // 区域面积（x 和 z 大小相乘）
                     float area = zone.bounds.size.x * zone.bounds.size.z;
+
+                    // 统计落在本区的人数
                     int inZone = 0;
                     foreach (var p in persons)
                         if (zone.bounds.Contains(p.transform.position))
                             inZone++;
+
                     float zoneDensity = area > 0f ? inZone / area : 0f;
                     Debug.Log($"[Density] Zone={zone.name}, count={inZone}, area={area:F1}, density={zoneDensity:F3}");
 
                     if (zoneDensity >= upperDensityThreshold)
-                        anyHigh = true;
+                        anyHigh = true;      // 只要有一个区超过阈值
                     if (zoneDensity > lowerDensityThreshold)
-                        allLow = false;
+                        allLow = false;      // 只要有一个区高于下限，就不能全部关闭
                 }
 
-                // 1. 密度高：围栏移动到目标点并开启三组切换
-                if (anyHigh && !hasFencesArrived)
+                // —— 自动开/关逻辑 —— 
+                if (anyHigh && !fencesEnabled)
                 {
-                    MoveAllFencesToTarget(() => {
-                        SetFenceSystemEnabled(true);
-                        hasFencesArrived = true;
-                        Debug.Log("围栏全部到达目标点，开启分组切换！");
-                    });
+                    // 任一区域拥堵 → 开围栏
+                    ToggleFenceSystem();
                 }
-                // 2. 密度低：围栏关闭，移回起始点并隐藏
-                else if (allLow && hasFencesArrived)
+                else if (allLow && fencesEnabled)
                 {
-                    SetFenceSystemEnabled(false);
-                    MoveAllFencesToStart();
-                    hasFencesArrived = false;
-                    Debug.Log("密度低，围栏全部收回起始点并隐藏！");
+                    // 全部区域稀疏 → 关围栏
+                    ToggleFenceSystem();
                 }
             }
+
             yield return new WaitForSeconds(densityCheckInterval);
         }
     }
 
-    void MoveAllFencesToTarget(System.Action onAllArrived = null)
-    {
-        var fences = fenceManager.movableFences;
-        int finished = 0;
-        if (fences.Count == 0)
-        {
-            onAllArrived?.Invoke();
-            return;
-        }
-        foreach (var f in fences)
-        {
-            var mover = f.GetComponent<FenceMover>();
-            var shrinker = f.GetComponent<FenceShrinker>();
-            if (mover)
-            {
-                // 先恢复显示
-                if (shrinker) shrinker.ResetEnlarge();
-                mover.MoveToTarget(() => {
-                    finished++;
-                    if (finished == fences.Count)
-                        onAllArrived?.Invoke();
-                });
-            }
-            else
-            {
-                // 无 mover 直接回调
-                finished++;
-                if (finished == fences.Count)
-                    onAllArrived?.Invoke();
-            }
-        }
-    }
 
-    void MoveAllFencesToStart()
-    {
-        var fences = fenceManager.movableFences;
-        foreach (var f in fences)
-        {
-            var mover = f.GetComponent<FenceMover>();
-            var shrinker = f.GetComponent<FenceShrinker>();
-            if (mover)
-            {
-                mover.MoveToStart(() => {
-                    if (shrinker) shrinker.StartShrinking();
-                });
-            }
-            else
-            {
-                if (shrinker) shrinker.StartShrinking();
-            }
-        }
-    }
 
     public void SetAutoDensityEnabled(bool on)
     {
         autoDensityEnabled = on;
         Debug.Log($"密度自动化已 {(on ? "启用" : "禁用")}");
     }
-}
 
+}

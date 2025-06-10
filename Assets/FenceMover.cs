@@ -1,43 +1,63 @@
+using Unity.AI.Navigation;
 using UnityEngine;
 using UnityEngine.AI;
 
-public class FenceMover : MonoBehaviour
+public class NewMonoBehaviourScript : MonoBehaviour
 {
-    public Transform startPoint;  
-    public Transform targetPoint;
-    public float moveSpeed = 5f;
+    public Transform pointA; // 在Inspector中拖入第一个位置
+    public Transform pointB; // 在Inspector中拖入第二个位置
 
-    private bool _isMoving = false;
-    private Vector3 _dest;
-    private System.Action _onArrive;
+    private NavMeshAgent agent;
+    private NavMeshSurface surface;
+    private bool flip = false;
 
-    
-    public void MoveToTarget(System.Action onArrive = null)
+    void Start()
     {
-        _dest = targetPoint.position;
-        _isMoving = true;
-        _onArrive = onArrive;
-    }
+        agent = GetComponent<NavMeshAgent>();
 
-    
-    public void MoveToStart(System.Action onArrive = null)
-    {
-        _dest = startPoint.position;
-        _isMoving = true;
-        _onArrive = onArrive;
+        // 初始化NavMeshSurface（可选，看你需不需要）
+        surface = GameObject.Find("NavSurface")?.GetComponent<NavMeshSurface>();
+
+        // 检查pointA是否存在
+        if (pointA != null)
+        {
+            agent.Warp(pointA.position); // 让agent瞬移到A点
+            agent.SetDestination(pointB != null ? pointB.position : pointA.position); // 目标是B，如果没B还是A
+            flip = false; // 默认从A到B
+        }
+        else
+        {
+            Debug.LogWarning("请在Inspector拖入pointA（起点）！");
+        }
     }
 
     void Update()
     {
-        if (_isMoving)
+        if (agent == null) return;
+
+        // 检查NavMesh状态
+        if (!agent.isOnNavMesh)
         {
-            transform.position = Vector3.MoveTowards(transform.position, _dest, moveSpeed * Time.deltaTime);
-            if (Vector3.Distance(transform.position, _dest) < 0.01f)
+            // 失去寻路时回到pointA
+            if (pointA != null)
+                agent.Warp(pointA.position);
+            return;
+        }
+
+        // 到达目标点后切换目标
+        if (agent.remainingDistance < 0.5f && !agent.pathPending)
+        {
+            if (flip)
             {
-                transform.position = _dest;
-                _isMoving = false;
-                _onArrive?.Invoke();
+                if (pointB != null)
+                    agent.SetDestination(pointB.position);
             }
+            else
+            {
+                if (pointA != null)
+                    agent.SetDestination(pointA.position);
+            }
+            flip = !flip;
         }
     }
 }
