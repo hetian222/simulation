@@ -1,0 +1,22 @@
+fileFormatVersion: 2
+guid: b654d5be4c499dd44bfac11cd41cf639
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - heightInput: {instanceID: 0}
+  - shoulderWidthInput: {instanceID: 0}
+  - personPrefab: {instanceID: 0}
+  - spawnPoint: {instanceID: 0}
+  - targetPoint: {instanceID: 0}
+  - speedInput: {instanceID: 0}
+  - countInput: {instanceID: 0}
+  - spawnPointDropdown: {instanceID: 0}
+  - spawnedCountText: {instanceID: 0}
+  - routeDropdown: {instanceID: 0}
+  - personTypeDropdown: {instanceID: 0}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
