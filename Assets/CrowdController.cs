@@ -10,7 +10,7 @@ public class CrowdController : MonoBehaviour
 {
     [Header(" 围栏管理 ")]
     public FenceManager fenceManager;
-    public float switchInterval = 10f;    // 定时分批切换间隔（保留原有功能）
+    public float switchInterval = 15f;    // 定时分批切换间隔（保留原有功能）
     private int currentGroup = 0;
     private Coroutine switchCoroutine;
 
@@ -31,6 +31,7 @@ public class CrowdController : MonoBehaviour
 
     private void Start()
     {
+        MoveAllFencesToStart();
         // 启动原有的定时分批切换协程
         switchCoroutine = StartCoroutine(SwitchCrowdFlow());
         // 启动多区域密度检测协程
@@ -118,6 +119,7 @@ public class CrowdController : MonoBehaviour
                 : "当前状态： 无围栏";
     }
     private bool autoDensityEnabled = true;
+    private bool hasFencesArrived = false;
     // —— 新增：多区域密度检测协程 —— 
     IEnumerator CheckDensityLoop()
     {
@@ -157,17 +159,51 @@ public class CrowdController : MonoBehaviour
                 {
                     // 任一区域拥堵 → 开围栏
                     ToggleFenceSystem();
+                    MoveAllFencesToTarget();
+                    hasFencesArrived = true;
+                    Debug.Log("围栏开始移动到目标点！");
                 }
                 else if (allLow && fencesEnabled)
                 {
                     // 全部区域稀疏 → 关围栏
-                    ToggleFenceSystem();
+                   // ToggleFenceSystem();
+                    MoveAllFencesToStart();
+                    hasFencesArrived = false;
+                    Debug.Log("围栏回收至起始点！");
                 }
             }
 
             yield return new WaitForSeconds(densityCheckInterval);
         }
     }
+    void MoveAllFencesToTarget()
+    {
+        foreach (var f in fenceManager.movableFences)
+        {
+            var mover = f.GetComponent<FenceMoverWithNavMesh>();
+            if (mover != null)
+            {
+                mover.StartMoving(); // 移动到目标点（pos_b）
+            }
+        }
+    }
+    void MoveAllFencesToStart()
+    {
+        foreach (var f in fenceManager.movableFences)
+        {
+            var mover = f.GetComponent<FenceMoverWithNavMesh>();
+            if (mover != null)
+            {
+                // 强制设置为起始状态
+                mover.agent.enabled = false;
+                mover.obstacle.enabled = true;
+                mover.transform.position = mover.pos_a;
+                mover.flipped = false;
+                mover.isMoving = false;
+            }
+        }
+    }
+
 
 
 

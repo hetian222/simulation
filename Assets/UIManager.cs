@@ -279,7 +279,7 @@ public class UIManager : MonoBehaviour
             int minutes = Mathf.FloorToInt(elapsed / 60f);
             int seconds = Mathf.FloorToInt(elapsed % 60f);
             if (elapsedTimeText != null)
-                elapsedTimeText.text = $"£º{minutes:D2}:{seconds:D2}";
+                elapsedTimeText.text = $"Escape Time:{minutes:D2}:{seconds:D2}";
             timingStarted = false;
         }
     }
